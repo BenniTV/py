@@ -10,14 +10,13 @@ class ConfigManager:
     def config_exists(self):
         return os.path.exists(self.config_path)
 
-    def save_config(self, host, port, user, password, database, setup_name):
+    def save_config(self, host, port, user, password, database):
         data = {
             "host": host,
             "port": port,
             "user": user,
             "password": password,
-            "database": database,
-            "setup_name": setup_name
+            "database": database
         }
         with open(self.config_path, "w") as f:
             json.dump(data, f, indent=4)
@@ -26,4 +25,13 @@ class ConfigManager:
         if not self.config_exists():
             return None
         with open(self.config_path, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+
+        # Backward compatibility for old config files containing extra keys
+        return {
+            "host": data.get("host", ""),
+            "port": data.get("port", "3306"),
+            "user": data.get("user", ""),
+            "password": data.get("password", ""),
+            "database": data.get("database", "")
+        }

@@ -16,7 +16,8 @@ class AdminApp(ctk.CTk):
         super().__init__()
 
         self.title("PyDispatch Admin")
-        self.geometry("600x700")
+        self.geometry("1360x860")
+        self.minsize(1180, 760)
         
         # Initialize Config Manager
         self.config_manager = ConfigManager()
@@ -47,6 +48,14 @@ class AdminApp(ctk.CTk):
     def handle_login(self, username, password, error_callback):
         try:
             config = self.config_manager.load_config()
+            if not config:
+                error_callback("Keine Datenbank-Konfiguration gefunden")
+                return
+
+            setup_name = self.db_manager.get_setup_name(config)
+            if setup_name:
+                config["setup_name"] = setup_name
+
             user = self.db_manager.authenticate_user(config, username, password)
             if user:
                 print(f"Login successful: {username}")
@@ -59,22 +68,55 @@ class AdminApp(ctk.CTk):
 
     def show_dashboard_view(self, config, user):
         self._clear_container()
-        dashboard = DashboardView(self.container, config, user, self.db_manager)
+        dashboard = DashboardView(self.container, config, user, self.db_manager, self.config_manager)
         dashboard.pack(fill="both", expand=True)
 
     def handle_setup_complete(self, data):
-        
         try:
-            # Initialize Database
-            self.db_manager.initialize_database(data, data)
-            
-            # Save Config locally
-            self.config_manager.save_config(
-                data["host"], data["port"], data["db_user"], 
-                data["db_pass"], data["db_name"], data["setup_name"]
+            mode = data.get("mode", "Neu einrichten")
+
+            if mode == "Neu einrichten":
+                # Initialize Database
+                self.db_manager.initialize_database(data, data)
+
+                # Save Config locally
+                self.config_manager.save_config(
+                    data["host"], data["port"], data["user"],
+                    data["password"], data["database"]
+                )
+                print("Config saved. Switching to Login.")
+                self.show_login_view()
+                return
+
+            config = {
+                "host": data["host"],
+                "port": data["port"],
+                "user": data["user"],
+                "password": data["password"],
+                "database": data["database"]
+            }
+
+            user = self.db_manager.authenticate_user(
+                config,
+                data["existing_user"],
+                data["existing_pass"]
             )
-            print("Config saved. Switching to Login.")
-            self.show_login_view()
+            if not user:
+                raise Exception("Ungültige Admin-Zugangsdaten")
+
+            if user.get("role") not in ("admin", "superadmin"):
+                raise Exception("Nur Admin oder SuperAdmin können ein Admin-Notebook verbinden")
+
+            setup_name = self.db_manager.get_setup_name(config)
+            if setup_name:
+                config["setup_name"] = setup_name
+
+            self.config_manager.save_config(
+                config["host"], config["port"], config["user"],
+                config["password"], config["database"]
+            )
+            print("Existing setup connected. Opening dashboard.")
+            self.show_dashboard_view(config, user)
         except Exception as e:
             print(f"Error during setup: {e}")
             self._clear_container()
@@ -88,6 +130,8 @@ class AdminApp(ctk.CTk):
 if __name__ == "__main__":
     ctk.set_appearance_mode("System")
     ctk.set_default_color_theme("blue")
+    ctk.set_widget_scaling(1.12)
+    ctk.set_window_scaling(1.06)
     
     app = AdminApp()
     app.mainloop()
