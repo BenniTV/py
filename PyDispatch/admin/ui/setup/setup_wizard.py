@@ -167,6 +167,39 @@ class SetupWizard(ctk.CTkFrame):
             show_error("Fehler", "Verbindung zur Datenbank konnte nicht hergestellt werden.")
             return
 
+        # MySQL-Config sofort speichern, damit der Login direkt darauf zugreifen kann
+        save_mysql_config(
+            host=self.mysql_host.get(),
+            port=int(self.mysql_port.get()),
+            user=self.mysql_user.get(),
+            password=self.mysql_password.get(),
+            database=self.mysql_database.get(),
+        )
+
+        # Sicherstellen, dass die Tabellen vorhanden sind (bei leerer/neuer DB)
+        if not check_tables_exist():
+            init_success, init_msg = initialize_database()
+            if not init_success:
+                show_error("Fehler", init_msg)
+                return
+
+        # Prüfen, ob bereits eine Einrichtung existiert
+        try:
+            result = db.execute("SELECT name FROM einrichtung ORDER BY id ASC LIMIT 1")
+            if result and result[0].get("name"):
+                einrichtungsname = result[0]["name"]
+                save_einrichtung_name(einrichtungsname)
+                show_info(
+                    "Einrichtung erkannt",
+                    "Diese Datenbank ist bereits eingerichtet.\n"
+                    "Sie werden direkt zur Anmeldung weitergeleitet.",
+                )
+                self.on_complete()
+                return
+        except Exception:
+            # Falls die Prüfung fehlschlägt, normal mit Setup fortfahren
+            pass
+
         self._show_step(1)
 
     # ── Schritt 2: Einrichtungsname ──
