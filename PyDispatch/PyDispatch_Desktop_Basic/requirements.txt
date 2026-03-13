@@ -1,4 +1,0 @@
-customtkinter
-mysql-connector-python
-Pillow
-packaging
